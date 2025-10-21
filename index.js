@@ -29,7 +29,7 @@ async function startServer() {
     console.log('✅ Kết nối Supabase thành công!');
     console.log('📊 PostgreSQL version:', result.rows[0].version);
   } catch (error) {
-    console.error('❌ Lỗi kết nối Supabase:', error);
+    console.error('❌ Lỗi kết nối Supabase:\n', error);
     process.exit(1);
   }
 
