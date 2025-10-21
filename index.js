@@ -2,8 +2,6 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const knexLib = require("knex");
-const morgan = require('morgan');
-const knexStream = require('./knexLogger');
 
 require("dotenv").config();
 
@@ -14,49 +12,37 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 async function startServer() {
-  // B1: Tạo kết nối tạm (chưa có database)
-  const tempKnex = knexLib({
-    client: "mysql2",
-    connection: {
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-    },
+  // KHÔNG dùng mysql2 nữa - kết nối trực tiếp với PostgreSQL
+  const environment = process.env.NODE_ENV || 'development';
+  console.log('🔗 Connecting to database with config:', {
+    client: knexConfig[environment].client,
+    host: knexConfig[environment].connection.host,
+    port: knexConfig[environment].connection.port
   });
 
-  // B2: Kiểm tra và tạo database nếu chưa có
-  const dbName = process.env.DB_NAME;
-  const exists = await tempKnex.raw(`SHOW DATABASES LIKE ?`, [dbName]);
-  if (exists[0].length === 0) {
-    await tempKnex.raw(`CREATE DATABASE ??`, [dbName]);
-    console.log(`✅ Created database '${dbName}'`);
-  } else {
-    console.log(`✅ Database '${dbName}' already exists`);
+  const knex = knexLib(knexConfig[environment]);
+  app.locals.db = knex;
+
+  // Kiểm tra kết nối
+  try {
+    const result = await knex.raw('SELECT version()');
+    console.log('✅ Kết nối Supabase thành công!');
+    console.log('📊 PostgreSQL version:', result.rows[0].version);
+  } catch (error) {
+    console.error('❌ Lỗi kết nối Supabase:', error);
+    process.exit(1);
   }
 
-  await tempKnex.destroy(); // đóng kết nối tạm
-
-  // B3: Kết nối knex chính thức
-  const knex = knexLib(knexConfig.development);
-  app.locals.db = knex; // nếu bạn muốn truy cập db qua req.app.locals.db
-
-  // B4: Cấu hình middleware
+  // Middleware
   app.use(cors());
   app.use(bodyParser.json());
-  app.use(
-    morgan(
-      ":method :url :status :response-time ms - :res[content-length] :remote-addr :user-agent",
-      { stream: knexStream }
-    )
-  );
-
+  
   app.use("/api", routes);
 
   app.get("/", (req, res) => {
     res.status(200).json({ mes: "Oke" });
   });
 
-  // B5: Start server
   app.listen(port, () => {
     console.log(`🚀 Server chạy tại http://localhost:${port}`);
   });
